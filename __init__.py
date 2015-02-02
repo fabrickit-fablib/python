@@ -1,8 +1,7 @@
 # coding: utf-8
 
 import re
-from fabric.api import warn_only
-from lib.api import package, run, sudo
+from fabkit import api, run, sudo, Package, filer
 from fablib import git
 
 
@@ -15,16 +14,16 @@ def setup():
 
     git.setup()
 
-    package.uninstall('python-crypto')  # デフォルトでインストールされていると邪魔なので消す
-    package.install('python-devel')
-    package.install('libxml2-devel')
-    package.install('libxslt-devel')
-    package.install('libffi-devel')
-    package.install('postgresql-devel')
-    package.install('openssl-devel')
-    package.install('gcc')
+    Package('python-crypto').uninstall()  # デフォルトでインストールされていると邪魔なので消す
+    Package('python-devel').install()
+    Package('libxml2-devel').install()
+    Package('libxslt-devel').install()
+    Package('libffi-devel').install()
+    Package('postgresql-devel').install()
+    Package('openssl-devel').install()
+    Package('gcc').install()
 
-    with warn_only():
+    with api.warn_only():
         result = run('which easy_install')
         if result.return_code != 0:
             sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo python')
@@ -39,24 +38,25 @@ def pip_show(package_name):
     pip show [package_name] の結果をパースして、タプル形式で返します。
     """
 
-    result = run('pip show {0}'.format(package_name))
-    if result == '':
-        return None
+    with api.warn_only():
+        result = run('pip show {0}'.format(package_name))
+        if result == '':
+            return None
 
-    RE_NAME = re.compile('Name: (.+)\r')
-    RE_VERSION = re.compile('Version: (.+)\r')
-    finded_name = RE_NAME.findall(result)
-    if len(finded_name) == 0:
-        return None
+        RE_NAME = re.compile('Name: (.+)\r')
+        RE_VERSION = re.compile('Version: (.+)\r')
+        finded_name = RE_NAME.findall(result)
+        if len(finded_name) == 0:
+            return None
 
-    name = finded_name[0]
+        name = finded_name[0]
 
-    finded_version = RE_VERSION.findall(result)
-    if len(finded_version) == 0:
-        return None
+        finded_version = RE_VERSION.findall(result)
+        if len(finded_version) == 0:
+            return None
 
-    version = finded_version[0]
-    return (name, version)
+        version = finded_version[0]
+        return (name, version)
 
 
 def install_from_git(package_name, git_url, tmp_dir=None):
@@ -68,9 +68,15 @@ def install_from_git(package_name, git_url, tmp_dir=None):
         sudo('''echo "import sys
 sys.setdefaultencoding(\'utf-8\')" >> {0}'''.format(sitecustomize))
 
-    clone_dir = git.sync(git_url)
+    git_dir = git.sync(git_url)
 
-    sudo('pip install -r {0}/requirements.txt'.format(clone_dir))
+    requirements_txt = '{0}/requirements.txt'.format(git_dir)
+    if filer.exists(requirements_txt):
+        sudo('pip install -r {0}'.format(requirements_txt))
 
     if not pip_show(package_name):
-        sudo('sh -c "cd {0} && python setup.py install"'.format(clone_dir))
+        sudo('sh -c "cd {0} && python setup.py install"'.format(git_dir))
+
+    return {
+        'git_dir': git_dir,
+    }
