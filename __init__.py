@@ -22,6 +22,7 @@ def setup():
     Package('postgresql-devel').install()
     Package('openssl-devel').install()
     Package('gcc').install()
+    Package('wget').install()
 
     with api.warn_only():
         result = run('which easy_install')
@@ -31,6 +32,14 @@ def setup():
         result = run('which pip')
         if result.return_code != 0:
             sudo('easy_install pip')
+
+    # encodeがaciiの場合は、utf-8に修正する
+    encoding = run('python -c "import sys; print sys.getdefaultencoding()"')
+    if encoding == 'ascii':
+        site_packages = run('python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"')  # noqa
+        sitecustomize = site_packages + '/sitecustomize.py'
+        sudo('''echo "import sys
+sys.setdefaultencoding(\'utf-8\')" >> {0}'''.format(sitecustomize))
 
 
 def pip_show(package_name):
@@ -60,14 +69,6 @@ def pip_show(package_name):
 
 
 def install_from_git(package_name, git_url, tmp_dir=None):
-    # encodeがaciiの場合は、utf-8に修正する
-    encoding = run('python -c "import sys; print sys.getdefaultencoding()"')
-    if encoding == 'ascii':
-        site_packages = run('python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"')  # noqa
-        sitecustomize = site_packages + '/sitecustomize.py'
-        sudo('''echo "import sys
-sys.setdefaultencoding(\'utf-8\')" >> {0}'''.format(sitecustomize))
-
     git_dir = git.sync(git_url)
 
     requirements_txt = '{0}/requirements.txt'.format(git_dir)
