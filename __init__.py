@@ -21,7 +21,11 @@ def setup():
     Package('libffi-devel').install()
     Package('postgresql-devel').install()
     Package('openssl-devel').install()
+    Package('blas-devel').install()
+    Package('lapack-devel').install()
+    Package('atlas-devel').install()
     Package('gcc').install()
+    Package('gcc-gfortran').install()
     Package('wget').install()
 
     with api.warn_only():
