@@ -5,7 +5,7 @@ from fabkit import api, run, sudo, Package, filer
 from fablib import git
 
 
-def setup():
+def setup(version=None):
     """
     easy_install, pipをインストールします。
     また、pipはパッケージインストール時にソースからコンパイルするため、
@@ -28,22 +28,30 @@ def setup():
     Package('gcc-gfortran').install()
     Package('wget').install()
 
-    with api.warn_only():
-        result = run('which easy_install')
-        if result.return_code != 0:
-            sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo python')
+    if version is None:
+        # XXX pipが一回目でインストールされない
+        # 二回目だとインストールされる
+        with api.warn_only():
+            result = run('which easy_install')
+            if result.return_code != 0:
+                sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo python')
 
-        result = run('which pip')
-        if result.return_code != 0:
-            sudo('easy_install pip')
+            result = run('which pip')
+            if result.return_code != 0:
+                sudo('easy_install pip')
 
-    # encodeがaciiの場合は、utf-8に修正する
-    encoding = run('python -c "import sys; print sys.getdefaultencoding()"')
-    if encoding == 'ascii':
-        site_packages = run('python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"')  # noqa
-        sitecustomize = site_packages + '/sitecustomize.py'
-        sudo('''echo "import sys
+        # encodeがaciiの場合は、utf-8に修正する
+        encoding = run('python -c "import sys; print sys.getdefaultencoding()"')
+        if encoding == 'ascii':
+            site_packages = run('python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"')  # noqa
+            sitecustomize = site_packages + '/sitecustomize.py'
+            sudo('''echo "import sys
 sys.setdefaultencoding(\'utf-8\')" >> {0}'''.format(sitecustomize))
+
+    elif version is '2.7':
+        filer.exists('/tmp/Python-2.7.9')
+        run('cd /tmp && wget https://www.python.org/ftp/python/2.7.9/Python-2.7.9.tgz && tar xvf Python-2.7.9.tgz')
+        sudo('cd /tmp/Python-2.7.9 && ./configure --prefix=/usr/local && make && make altinstal')
 
 
 def pip_show(package_name):
