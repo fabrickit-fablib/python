@@ -48,12 +48,15 @@ class Python():
 
             with api.warn_only():
                 result = run('[ -e {0}/bin/easy_install-2.7 ]'.format(self.prefix))
-                if result.return_code != 0:
-                    sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo {0}/bin/python2.7'.format(self.prefix))  # noqa
 
+            if result.return_code != 0:
+                sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo {0}/bin/python2.7'.format(self.prefix))  # noqa
+
+            with api.warn_only():
                 result = run('[ -e {0}/bin/pip2.7 ]'.format(self.prefix))
-                if result.return_code != 0:
-                    sudo('{0}/bin/easy_install-2.7 pip'.format(self.prefix))
+
+            if result.return_code != 0:
+                sudo('{0}/bin/easy_install-2.7 pip'.format(self.prefix))
 
             return
             # encodeがaciiの場合は、utf-8に修正する
@@ -109,3 +112,6 @@ class Python():
         return {
             'git_dir': git_dir,
         }
+
+    def get_site_packages(self):
+        return run('{0}/bin/python{1} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"'.format(self.prefix, self.version))  # noqa
