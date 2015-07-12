@@ -6,7 +6,7 @@ from fablib import git
 
 
 class Python():
-    def __init__(self, prefix='/opt/local', version='2.7'):
+    def __init__(self, prefix='/usr', version='2.7'):
         self.prefix = prefix
         self.version = version
 
@@ -38,34 +38,26 @@ class Python():
         Package('gcc-gfortran').install()
         Package('wget').install()
 
-        if self.version == '2.7':
-            if not filer.exists('/tmp/Python-2.7.9'):
-                run('cd /tmp && wget https://www.python.org/ftp/python/2.7.9/Python-2.7.9.tgz && tar xvf Python-2.7.9.tgz')  # noqa
-            with api.warn_only():
-                result = run('[ -e {0}/bin/python2.7 ]'.format(self.prefix))
-                if result.return_code != 0:
-                    sudo('sh -c "cd /tmp/Python-2.7.9 && ./configure --prefix={0} && make && make altinstall"'.format(self.prefix))  # noqa
+        if self.prefix != '/usr':
+            if self.version == '2.7':
+                if not filer.exists('/tmp/Python-2.7.9'):
+                    run('cd /tmp && wget https://www.python.org/ftp/python/2.7.9/Python-2.7.9.tgz && tar xvf Python-2.7.9.tgz')  # noqa
+                with api.warn_only():
+                    result = run('[ -e {0}/bin/python2.7 ]'.format(self.prefix))
+                    if result.return_code != 0:
+                        sudo('sh -c "cd /tmp/Python-2.7.9 && ./configure --prefix={0} && make && make altinstall"'.format(self.prefix))  # noqa
 
-            with api.warn_only():
-                result = run('[ -e {0}/bin/easy_install-2.7 ]'.format(self.prefix))
+        with api.warn_only():
+            result = run('[ -e {0}/bin/easy_install-{1} ]'.format(self.prefix, self.version))
 
-            if result.return_code != 0:
-                sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo {0}/bin/python2.7'.format(self.prefix))  # noqa
+        if result.return_code != 0:
+            sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo {0}/bin/python{1}'.format(self.prefix, self.version))  # noqa
 
-            with api.warn_only():
-                result = run('[ -e {0}/bin/pip2.7 ]'.format(self.prefix))
+        with api.warn_only():
+            result = run('[ -e {0}/bin/pip{1} ]'.format(self.prefix, self.version))
 
-            if result.return_code != 0:
-                sudo('{0}/bin/easy_install-2.7 pip'.format(self.prefix))
-
-            return
-            # encodeがaciiの場合は、utf-8に修正する
-            encoding = run('python -c "import sys; print sys.getdefaultencoding()"')
-            if encoding == 'ascii':
-                site_packages = run('python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"')  # noqa
-                sitecustomize = site_packages + '/sitecustomize.py'
-                sudo('''echo "import sys
-    sys.setdefaultencoding(\'utf-8\')" >> {0}'''.format(sitecustomize))
+        if result.return_code != 0:
+            sudo('{0}/bin/easy_install-{1} pip'.format(self.prefix, self.version))
 
     def install(self, package_name=None, file_name=None):
         if package_name:
