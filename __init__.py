@@ -16,6 +16,9 @@ class Python():
     def get_version(self):
         return self.prefix
 
+    def get_cmd(self):
+        return '{0}/bin/python{1}'.format(self.prefix, self.version)  # noqa
+
     def setup(self):
         """
         easy_install, pipをインストールします。
@@ -51,7 +54,7 @@ class Python():
             result = run('[ -e {0}/bin/easy_install-{1} ]'.format(self.prefix, self.version))
 
         if result.return_code != 0:
-            sudo('wget https://bootstrap.pypa.io/ez_setup.py -O - | sudo {0}/bin/python{1}'.format(self.prefix, self.version))  # noqa
+            sudo('sh -c "cd /tmp/ && wget https://bootstrap.pypa.io/ez_setup.py -O - | {1}"'.format(self.prefix, self.get_cmd()))  # noqa
 
         with api.warn_only():
             result = run('[ -e {0}/bin/pip{1} ]'.format(self.prefix, self.version))
