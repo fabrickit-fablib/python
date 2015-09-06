@@ -93,14 +93,17 @@ class Python():
             version = finded_version[0]
             return (name, version)
 
-    def install_from_git(self, package_name, git_url, tmp_dir=None):
-        git_dir = git.sync(git_url)
+    def install_from_git(self, package_name, git_url, git_dir=None, is_develop=False):
+        git_dir = git.sync(git_url, git_dir=git_dir)
 
         requirements_txt = '{0}/requirements.txt'.format(git_dir)
         if filer.exists(requirements_txt):
             self.install(file_name=requirements_txt)
 
-        if not self.pip_show(package_name):
+        if is_develop:
+            sudo('sh -c "cd {0} && {1}/bin/python{2} setup.py develop"'.format(
+                git_dir, self.prefix, self.version))
+        else:
             sudo('sh -c "cd {0} && {1}/bin/python{2} setup.py install"'.format(
                 git_dir, self.prefix, self.version))
 
