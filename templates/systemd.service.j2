@@ -1,0 +1,12 @@
+[Unit]
+Description={{ description }}
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart={{ exec }}
+ExecStop=/bin/kill -WINCH ${MAINPID}
+User={{ user }}
+
+[Install]
+WantedBy=multi-user.target

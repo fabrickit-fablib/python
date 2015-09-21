@@ -1,23 +1,20 @@
 # coding: utf-8
 
 import re
-from fabkit import api, run, sudo, Package, filer
+import os
+from fabkit import api, run, sudo, Package, filer, env, user
 from fablib import git
 
 
 class Python():
-    def __init__(self, prefix='/usr', version='2.7'):
+    def __init__(self, prefix='/usr'):
         self.prefix = prefix
-        self.version = version
 
     def get_prefix(self):
         return self.prefix
 
-    def get_version(self):
-        return self.prefix
-
     def get_cmd(self):
-        return '{0}/bin/python{1}'.format(self.prefix, self.version)  # noqa
+        return '{0}/bin/python{1}'.format(self.prefix)  # noqa
 
     def setup(self):
         """
@@ -41,32 +38,28 @@ class Python():
         Package('gcc-gfortran').install()
         Package('wget').install()
 
+        with api.warn_only():
+            result = run('which easy_install')
+
+        if result.return_code != 0:
+            sudo('sh -c "cd /tmp/ && wget https://bootstrap.pypa.io/ez_setup.py -O - | python"')
+
+        with api.warn_only():
+            result = run('which pip')
+
+        if result.return_code != 0:
+            sudo('easy_install pip')
+
         if self.prefix != '/usr':
-            if self.version == '2.7':
-                if not filer.exists('/tmp/Python-2.7.9'):
-                    run('cd /tmp && wget https://www.python.org/ftp/python/2.7.9/Python-2.7.9.tgz && tar xvf Python-2.7.9.tgz')  # noqa
-                with api.warn_only():
-                    result = run('[ -e {0}/bin/python2.7 ]'.format(self.prefix))
-                    if result.return_code != 0:
-                        sudo('sh -c "cd /tmp/Python-2.7.9 && ./configure --prefix={0} && make && make altinstall"'.format(self.prefix))  # noqa
-
-        with api.warn_only():
-            result = run('[ -e {0}/bin/easy_install-{1} ]'.format(self.prefix, self.version))
-
-        if result.return_code != 0:
-            sudo('sh -c "cd /tmp/ && wget https://bootstrap.pypa.io/ez_setup.py -O - | {1}"'.format(self.prefix, self.get_cmd()))  # noqa
-
-        with api.warn_only():
-            result = run('[ -e {0}/bin/pip{1} ]'.format(self.prefix, self.version))
-
-        if result.return_code != 0:
-            sudo('{0}/bin/easy_install-{1} pip'.format(self.prefix, self.version))
+            sudo('pip install virtualenv')
+            if not filer.exists(self.prefix):
+                sudo('virtualenv {0} --system-site-packages'.format(self.prefix))
 
     def install(self, package_name=None, file_name=None):
         if package_name:
-            sudo("{0}/bin/pip{1} install '{2}'".format(self.prefix, self.version, package_name))
+            sudo("{0}/bin/pip install '{1}'".format(self.prefix, package_name))
         elif file_name:
-            sudo("{0}/bin/pip{1} install -r {2}".format(self.prefix, self.version, file_name))
+            sudo("{0}/bin/pip install -r {1}".format(self.prefix, file_name))
 
     def pip_show(self, package_name):
         """
@@ -93,23 +86,48 @@ class Python():
             version = finded_version[0]
             return (name, version)
 
-    def install_from_git(self, package_name, git_url, git_dir=None, is_develop=False):
-        git_dir = git.sync(git_url, git_dir=git_dir)
+    def install_from_git(self, name, git_url, exec_user='root', branch=None, is_develop=False,
+                         mkdirs=[], cpdirs=[], services=[], append_packages=[], **kwargs):
+
+        user.add(exec_user)
+
+        git_dir = os.path.join(self.prefix, 'src', name)
+        git.sync(git_url, branch=branch, git_dir=git_dir, owner=env.user)
 
         requirements_txt = '{0}/requirements.txt'.format(git_dir)
         if filer.exists(requirements_txt):
             self.install(file_name=requirements_txt)
 
         if is_develop:
-            sudo('sh -c "cd {0} && {1}/bin/python{2} setup.py develop"'.format(
-                git_dir, self.prefix, self.version))
+            sudo('sh -c "cd {0} && {1}/bin/python setup.py develop"'.format(
+                git_dir, self.prefix))
         else:
-            sudo('sh -c "cd {0} && {1}/bin/python{2} setup.py install"'.format(
-                git_dir, self.prefix, self.version))
+            sudo('sh -c "cd {0} && {1}/bin/python setup.py install"'.format(
+                git_dir, self.prefix))
+
+        for mkdir in mkdirs:
+            filer.mkdir(mkdir['path'], owner=mkdir.get('owner', exec_user))
+
+        for cpdir in cpdirs:
+            if filer.exists(cpdir['to']):
+                continue
+
+            sudo('cp -r {0} {1}'.format(
+                os.path.join(git_dir, cpdir['from']), cpdir['to']))
+
+        for service in services:
+            service['user'] = exec_user
+            filer.template(
+                '/etc/systemd/system/{0}.service'.format(service['name']),
+                src='systemd.service.j2', mode='755',
+                data=service)
+
+        for package in append_packages:
+            self.install(package)
 
         return {
             'git_dir': git_dir,
         }
 
     def get_site_packages(self):
-        return run('{0}/bin/python{1} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"'.format(self.prefix, self.version))  # noqa
+        return run('{0}/bin/python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"'.format(self.prefix))  # noqa
