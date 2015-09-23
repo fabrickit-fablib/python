@@ -14,7 +14,7 @@ class Python():
         return self.prefix
 
     def get_cmd(self):
-        return '{0}/bin/python{1}'.format(self.prefix)  # noqa
+        return '{0}/bin/python'.format(self.prefix)  # noqa
 
     def setup(self):
         """
