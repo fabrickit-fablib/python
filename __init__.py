@@ -87,7 +87,7 @@ class Python():
             return (name, version)
 
     def install_from_git(self, name, git_url, exec_user='root', branch=None, is_develop=False,
-                         mkdirs=[], cpdirs=[], services=[], append_packages=[], **kwargs):
+                         lns=[], mkdirs=[], cpdirs=[], services=[], append_packages=[], **kwargs):
 
         user.add(exec_user)
 
@@ -124,6 +124,10 @@ class Python():
 
         for package in append_packages:
             self.install(package)
+
+        for ln in lns:
+            if not filer.exists(ln['dest']):
+                sudo('ln -s {0} {1}'.format(ln['src'], ln['dest']))
 
         return {
             'git_dir': git_dir,
