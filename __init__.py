@@ -74,11 +74,11 @@ class Python(SimpleBase):
             if not filer.exists(self.prefix):
                 sudo('virtualenv {0} --system-site-packages'.format(self.prefix))
 
-    def install(self, package_name=None, file_name=None):
+    def install(self, package_name=None, requirements=None):
         if package_name:
             sudo("{0}/bin/pip install '{1}'".format(self.prefix, package_name))
-        elif file_name:
-            sudo("{0}/bin/pip install -r {1}".format(self.prefix, file_name))
+        elif requirements:
+            sudo("{0}/bin/pip install -r {1}".format(self.prefix, requirements))
 
     def pip_show(self, package_name):
         """
