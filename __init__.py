@@ -2,9 +2,9 @@
 
 import re
 import os
-from fabkit import api, run, sudo, Package, filer, env, user
+from fabkit import api, run, sudo, filer, env, user
 from fablib import git
-from fablit import SimpleBase
+from fablib.base import SimpleBase
 
 
 class Python(SimpleBase):
@@ -25,6 +25,19 @@ class Python(SimpleBase):
                 'gcc-gfortran',
                 'wget',
             ],
+            'Ubuntu 14.*': [
+                'python-dev',
+                'libxml2-dev',
+                'libxslt-dev',
+                'libffi-dev',
+                'libssl-dev',
+                'libblas-dev',
+                'liblapack-dev',
+                'libatlas-dev',
+                'gcc',
+                'gfortran',
+                'wget',
+            ]
         }
 
     def get_prefix(self):
