@@ -4,11 +4,28 @@ import re
 import os
 from fabkit import api, run, sudo, Package, filer, env, user
 from fablib import git
+from fablit import SimpleBase
 
 
-class Python():
+class Python(SimpleBase):
     def __init__(self, prefix='/usr'):
         self.prefix = prefix
+        self.packages = {
+            'CentOS Linux 7.*': [
+                'python-devel',
+                'libxml2-devel',
+                'libxslt-devel',
+                'libffi-devel',
+                'postgresql-devel',
+                'openssl-devel',
+                'blas-devel',
+                'lapack-devel',
+                'atlas-devel',
+                'gcc',
+                'gcc-gfortran',
+                'wget',
+            ],
+        }
 
     def get_prefix(self):
         return self.prefix
@@ -22,21 +39,10 @@ class Python():
         また、pipはパッケージインストール時にソースからコンパイルするため、
         いくつかのdevelパッケージをインストールしておきます。
         """
+        self.init()
 
         git.setup()
-
-        Package('python-devel').install()
-        Package('libxml2-devel').install()
-        Package('libxslt-devel').install()
-        Package('libffi-devel').install()
-        Package('postgresql-devel').install()
-        Package('openssl-devel').install()
-        Package('blas-devel').install()
-        Package('lapack-devel').install()
-        Package('atlas-devel').install()
-        Package('gcc').install()
-        Package('gcc-gfortran').install()
-        Package('wget').install()
+        self.install_packages()
 
         with api.warn_only():
             result = run('which easy_install')
@@ -86,34 +92,35 @@ class Python():
             version = finded_version[0]
             return (name, version)
 
-    def install_from_git(self, name, git_url, exec_user='root', branch=None, is_develop=False,
-                         lns=[], mkdirs=[], cpdirs=[], services=[], append_packages=[], **kwargs):
+    def setup_package(self, name, git_repos=[], exec_user='root', branch=None, is_develop=False,
+                      mk_links=[], mk_dirs=[], cp_files=[], services=[], requirements=[], **kwargs):
 
         user.add(exec_user)
 
-        git_dir = os.path.join(self.prefix, 'src', name)
-        git.sync(git_url, branch=branch, git_dir=git_dir, owner=env.user)
+        for git_repo in git_repos:
+            git_dir = os.path.join(self.prefix, 'src', git_repo['name'])
+            git.sync(git_repo['url'], branch=git_repo['branch'], git_dir=git_dir, owner=env.user)
 
-        requirements_txt = '{0}/requirements.txt'.format(git_dir)
-        if filer.exists(requirements_txt):
-            self.install(file_name=requirements_txt)
+            requirements_txt = '{0}/requirements.txt'.format(git_dir)
+            if filer.exists(requirements_txt):
+                self.install(file_name=requirements_txt)
 
-        if is_develop:
-            sudo('sh -c "cd {0} && {1}/bin/python setup.py develop"'.format(
-                git_dir, self.prefix))
-        else:
-            sudo('sh -c "cd {0} && {1}/bin/python setup.py install"'.format(
-                git_dir, self.prefix))
+            if is_develop:
+                sudo('sh -c "cd {0} && {1}/bin/python setup.py develop"'.format(
+                    git_dir, self.prefix))
+            else:
+                sudo('sh -c "cd {0} && {1}/bin/python setup.py install"'.format(
+                    git_dir, self.prefix))
 
-        for mkdir in mkdirs:
+        for mkdir in mk_dirs:
             filer.mkdir(mkdir['path'], owner=mkdir.get('owner', exec_user))
 
-        for cpdir in cpdirs:
-            if filer.exists(cpdir['to']):
+        for cpfile in cp_files:
+            if filer.exists(cpfile['dest']):
                 continue
 
             sudo('cp -r {0} {1}'.format(
-                os.path.join(git_dir, cpdir['from']), cpdir['to']))
+                os.path.join(git_dir, cpfile['src']), cpfile['dest']))
 
         for service in services:
             service['user'] = exec_user
@@ -122,16 +129,12 @@ class Python():
                 src='systemd.service.j2', mode='755',
                 data=service)
 
-        for package in append_packages:
-            self.install(package)
+        for requirement in requirements:
+            self.install(requirement)
 
-        for ln in lns:
-            if not filer.exists(ln['dest']):
-                sudo('ln -s {0} {1}'.format(ln['src'], ln['dest']))
-
-        return {
-            'git_dir': git_dir,
-        }
+        for link in mk_links:
+            if not filer.exists(link['dest']):
+                sudo('ln -s {0} {1}'.format(link['src'], link['dest']))
 
     def get_site_packages(self):
         return run('{0}/bin/python -c "from distutils.sysconfig import get_python_lib; print get_python_lib()"'.format(self.prefix))  # noqa
