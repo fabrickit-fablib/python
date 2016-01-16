@@ -6,6 +6,9 @@ from fablib.python import Python
 
 @task
 def setup():
-    python = Python('/opt/test-python')
+    prefix = '/opt/test-python'
+    python = Python(prefix)
     python.setup()
     python.install('flake8')
+    assert python.get_prefix() == prefix
+    assert python.get_cmd() == '{0}/bin/python'.format(prefix)
