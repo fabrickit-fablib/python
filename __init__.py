@@ -112,11 +112,14 @@ class Python(SimpleBase):
 
         for git_repo in git_repos:
             git_dir = os.path.join(self.prefix, 'src', git_repo['name'])
-            git.sync(git_repo['url'], branch=git_repo['branch'], git_dir=git_dir, owner=env.user)
+            git_dir_parent = os.path.dirname(git_dir)
+            filer.mkdir(git_dir_parent, mode='777')
+
+            git.sync(git_repo['url'], branch=git_repo['branch'], dest=git_dir)
 
             requirements_txt = '{0}/requirements.txt'.format(git_dir)
             if filer.exists(requirements_txt):
-                self.install(file_name=requirements_txt)
+                self.install(requirements=requirements_txt)
 
             if is_develop:
                 sudo('sh -c "cd {0} && {1}/bin/python setup.py develop"'.format(
